@@ -30,7 +30,7 @@ class TodoBloc extends HydratedBloc<TodoEvent, TodoState> {
   }
 
   StreamSubscription<TodosState> _subscription;
-  final Todo _todo;
+  Todo _todo;
   final TodosBloc _todosBloc;
 
   @override
@@ -50,13 +50,16 @@ class TodoBloc extends HydratedBloc<TodoEvent, TodoState> {
   ) async* {
     if (event is TodoTaskChanged) {
       yield _mapTodoTaskChangedToState(event, state);
+    } else if (event is TodoCompleteChanged) {
+      yield _mapTodoCompleteChangedToState(event, state);
     } else if (event is TodoSaved) {
-      _todosBloc.add(TaskUpdated(state.todo.task));
+      _todo = state.todo;
+      _todosBloc.add(TodoSavedUpstream(state.todo));
       yield TodoState(state.todo, invalidated: true);
     } else if (event is TodoUpdated) {
       yield TodoState(
         _merge(event.todo, state.todo, state.invalidated),
-        dirty: event.todo.task != state.todo.task,
+        dirty: event.todo != state.todo,
       );
     }
   }
@@ -68,14 +71,24 @@ class TodoBloc extends HydratedBloc<TodoEvent, TodoState> {
   }
 
   TodoState _mapTodoTaskChangedToState(TodoTaskChanged event, TodoState state) {
+    final newTodo = state.todo.copyWith(task: event.task);
     return TodoState(
-      state.todo.copyWith(task: event.task),
-      dirty: event.task != _todo.task,
+      newTodo,
+      dirty: newTodo != _todo,
+    );
+  }
+
+  TodoState _mapTodoCompleteChangedToState(
+      TodoCompleteChanged event, TodoState state) {
+    final newTodo = state.todo.copyWith(complete: event.complete);
+    return TodoState(
+      newTodo,
+      dirty: newTodo != _todo,
     );
   }
 
   Todo _merge(Todo remote, Todo local, bool invalidated) {
-    return invalidated ? remote : local.copyWith(complete: remote.complete);
+    return invalidated ? remote : local;
   }
 
   @override
